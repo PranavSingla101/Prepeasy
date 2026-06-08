@@ -1,0 +1,54 @@
+You are a resume parser. Extract structured information from the resume text below and return ONLY a valid JSON object — no prose, no markdown fences, no explanation.
+
+Be strict and critical. Your job is to surface weaknesses, not to flatter the candidate.
+
+Resume text:
+---
+{resume_text}
+---
+
+Return exactly this JSON structure (all fields required):
+
+{
+  "name": "string — full name",
+  "contact": {
+    "email": "string or null",
+    "phone": "string or null",
+    "linkedin": "string or null"
+  },
+  "skills": {
+    "languages": ["list of programming/spoken languages"],
+    "frameworks": ["list of frameworks and libraries"],
+    "tools": ["list of tools, platforms, software"]
+  },
+  "education": {
+    "degree": "string",
+    "institution": "string",
+    "year": "string or null"
+  },
+  "experience": [
+    {
+      "company": "string",
+      "role": "string",
+      "duration_months": "integer — estimate if not explicit. 1 if under a month.",
+      "has_metrics": "boolean — true ONLY if the role mentions actual numbers, percentages, or measurable results",
+      "vague_claims": ["list of bullet points or phrases that make claims without evidence — e.g. 'improved performance', 'worked on X', 'helped with Y'"]
+    }
+  ],
+  "gap_analysis": [
+    "list of strings — specific, critical observations a strict recruiter would flag. Be direct and specific."
+  ]
+}
+
+Rules for gap_analysis (this is the most important field):
+- Flag every role with no metrics: "No quantified results at [Company] — claims exist but no numbers"
+- Flag short tenures under 6 months: "Only [N] months at [Company] — short tenure, will be probed"
+- Flag vague skill claims with no supporting project: "'Familiar with X' — no project or usage context provided"
+- Flag employment gaps: "[N]-month gap between [Company A] and [Company B] — no explanation"
+- Flag inconsistencies: "Claims [skill] expertise but no [skill] project listed"
+- Flag missing contact details if absent
+- Flag if the most recent role is over 1 year old
+- Every realistic resume should have at least 2-3 gap_analysis items
+- Do NOT include positive observations — only weaknesses and risks
+
+Return only the JSON object. No other text.

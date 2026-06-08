@@ -1,0 +1,37 @@
+# Environment
+.env
+.env.*
+
+# Virtual environment
+Interv/
+venv/
+.venv/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Database
+*.db
+*.sqlite3
+
+# Sample resumes (add your own locally)
+data/resume_samples/
+
+# IDE / OS
+.vscode/
+.idea/
+*.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
