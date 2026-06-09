@@ -7,7 +7,7 @@
 | **Pipecat** | Pipeline orchestration (STT → LLM → TTS) | Purpose-built for real-time voice agents; handles turn-taking and barge-in out of the box |
 | **Deepgram Nova-3** | Streaming speech-to-text | ~150ms P50 latency — fast enough to feel natural in conversation |
 | **Silero VAD** | Voice activity detection | Runs locally on CPU, no API cost, reliable silence/speech boundary detection |
-| **Cartesia Sonic** | Text-to-speech | ~40ms time-to-first-audio — the fastest TTS available for low-latency voice |
+| **Google AI Studio TTS** | Text-to-speech | Native to the Gemini ecosystem; no additional API key — same `GEMINI_API_KEY` used for LLM calls |
 
 ## LLM
 

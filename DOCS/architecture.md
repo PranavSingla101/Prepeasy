@@ -11,7 +11,7 @@ The backend is split into two fully independent systems. They share no internal 
 This split means:
 - The voice pipeline can be tested without any LLM calls
 - The orchestrator can be tested by replaying transcripts — no audio needed
-- Providers (Deepgram, Cartesia, Gemini) can each be swapped independently
+- Providers (Deepgram, Google TTS, Gemini) can each be swapped independently
 - Latency bottlenecks are traceable to one system, not a tangled call chain
 
 ---
@@ -21,7 +21,7 @@ This split means:
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                        USER BROWSER                             │
-│  [Upload PDF] → [Start Interview] → [Live Transcript] → [PDF]  │
+│  [Upload PDF] → [Start Interview] → [Live Transcript] → [PDF]   │
 └─────────────────┬───────────────────────────────┬───────────────┘
                   │ HTTP (upload)                 │ WebSocket (audio)
                   ▼                               ▼
@@ -31,7 +31,7 @@ This split means:
 │   WebSocket → Silero VAD → Deepgram STT → transcript event      │
 │                                               │                 │
 │                                               ▼                 │
-│   Cartesia TTS ← text response  ←────────────┤                 │
+│   Google TTS ← text response   ←────────────┤                   │
 │                                               │                 │
 └───────────────────────────────────────────────┼─────────────────┘
                                                 │ transcript event
@@ -39,18 +39,18 @@ This split means:
 ┌─────────────────────────────────────────────────────────────────┐
 │  SYSTEM 2 — INTERVIEW ORCHESTRATOR   (all intelligence)         │
 │                                                                 │
-│  ┌──────────────┐    ┌──────────────┐    ┌──────────────────┐  │
-│  │ PDF Parser   │    │ Question     │    │  Interview       │  │
-│  │ (pdfplumber) │───▶│ Generator    │───▶│  State Machine   │  │
-│  │ + Gemini     │    │ (Gemini)     │    │  (Gemini)        │  │
-│  └──────────────┘    └──────────────┘    └────────┬─────────┘  │
+│  ┌──────────────┐    ┌──────────────┐    ┌──────────────────┐   │
+│  │ PDF Parser   │    │ Question     │    │  Interview       │   │
+│  │ (pdfplumber) │───▶│ Generator    │───▶│  State Machine  │   │
+│  │ + Gemini     │    │ (Gemini)     │    │  (Gemini)        │   │
+│  └──────────────┘    └──────────────┘    └────────┬─────────┘   │
 │                                                   │             │
 │  ┌──────────────────────────────────────────────────────────┐   │
 │  │  Async Scoring  [transcript] → Gemini → ScoreResult      │   │
 │  └──────────────────────────────────────────────────────────┘   │
 │                                                                 │
 │  ┌──────────────────────────────────────────────────────────┐   │
-│  │  Report Generator  [scores] → Gemini → WeasyPrint PDF   │   │
+│  │  Report Generator  [scores] → Gemini → WeasyPrint PDF    │   │
 │  └──────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -65,7 +65,7 @@ The voice pipeline does exactly four things and nothing else:
 |---|---|---|
 | Speech-to-text | Deepgram Nova-3 | Final transcript string (~150ms latency) |
 | Voice activity detection | Silero VAD | `vad_start` / `vad_end` events |
-| Text-to-speech | Cartesia Sonic | Audio stream (~40ms TTFA) |
+| Text-to-speech | Google AI Studio TTS | Audio stream via Gemini TTS API |
 | Streaming transport | WebSocket + Pipecat | Audio chunks, interruption detection, buffering |
 
 When a final transcript arrives, the pipeline emits a `transcript_received` event and waits. It does not call Gemini. It does not look at the question bank. It does not know what phase the interview is in.
@@ -170,7 +170,7 @@ Every meaningful moment in the voice pipeline is written to an `events` table in
 | `transcript_received` | Deepgram returns final transcript | `question_id`, `text`, `deepgram_latency_ms` |
 | `question_asked` | Agent begins speaking a question | `question_id`, `category`, `text` |
 | `interruption` | User barge-in detected mid-TTS | `question_id`, `tts_elapsed_ms` |
-| `tts_complete` | Cartesia finishes speaking | `question_id`, `ttfa_ms`, `total_duration_ms` |
+| `tts_complete` | Google TTS finishes speaking | `question_id`, `ttfa_ms`, `total_duration_ms` |
 | `scoring_complete` | Async scoring finishes for an answer | `question_id`, `scores`, `scoring_duration_ms` |
 
 ### What you can debug with this

@@ -51,3 +51,59 @@ def get_resume(resume_id: str) -> dict | None:
     result = dict(row)
     result["structured_json"] = json.loads(result["structured_json"])
     return result
+
+
+# ---------------------------------------------------------------------------
+# Question bank
+# ---------------------------------------------------------------------------
+
+def _init_question_banks_table(conn: sqlite3.Connection) -> None:
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS question_banks (
+            session_id    TEXT PRIMARY KEY,
+            resume_name   TEXT NOT NULL,
+            questions_json TEXT NOT NULL,
+            created_at    REAL NOT NULL
+        )
+    """)
+
+
+def save_question_bank(bank) -> None:
+    """Persist a QuestionBank to SQLite. Raises if session_id already exists."""
+    import time
+    from backend.schemas.questions import QuestionBank
+    with _connect() as conn:
+        _init_question_banks_table(conn)
+        existing = conn.execute(
+            "SELECT 1 FROM question_banks WHERE session_id = ?", (bank.session_id,)
+        ).fetchone()
+        if existing:
+            raise ValueError(f"question_bank for session_id '{bank.session_id}' already exists")
+        conn.execute(
+            "INSERT INTO question_banks (session_id, resume_name, questions_json, created_at) "
+            "VALUES (?, ?, ?, ?)",
+            (
+                bank.session_id,
+                bank.resume_name,
+                json.dumps(bank.model_dump()["questions"]),
+                time.time(),
+            ),
+        )
+        conn.commit()
+
+
+def get_question_bank(session_id: str):
+    """Fetch and validate a QuestionBank from SQLite by session_id."""
+    from backend.schemas.questions import QuestionBank
+    with _connect() as conn:
+        _init_question_banks_table(conn)
+        row = conn.execute(
+            "SELECT * FROM question_banks WHERE session_id = ?", (session_id,)
+        ).fetchone()
+    if row is None:
+        raise KeyError(f"No question_bank found for session_id '{session_id}'")
+    return QuestionBank.model_validate({
+        "session_id": row["session_id"],
+        "resume_name": row["resume_name"],
+        "questions": json.loads(row["questions_json"]),
+    })

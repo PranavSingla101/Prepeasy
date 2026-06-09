@@ -35,7 +35,7 @@
 **Verify:**
 - Each behavioral question references a specific resume bullet
 - Each gap-probing question targets something from `gap_analysis`
-- 28 questions generated in under 15 seconds
+- 28 questions generated
 - Manually read the output — every question should feel tailored, not generic
 - `QuestionBank` Pydantic validation passes cleanly
 
@@ -47,7 +47,7 @@
 
 ### System 1 — Voice Pipeline (`backend/voice_pipeline/`)
 
-- Set up Pipecat with Deepgram STT, Silero VAD, Cartesia TTS
+- Set up Pipecat with Deepgram STT, Silero VAD, Google AI Studio TTS
 - Build the pipeline: WebSocket audio → VAD → STT → emit `transcript_received` event
 - Handle transport: audio chunks, interruption detection, buffering
 - The pipeline never calls Gemini — it emits events and receives text back, nothing else

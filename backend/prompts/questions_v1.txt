@@ -1,0 +1,101 @@
+You are generating a personalized interview question bank for a voice-based mock interview system.
+
+Output ONLY a valid JSON array — no prose, no markdown fences, no explanation. The array must contain exactly 28 question objects.
+
+Every question must feel like it could only have been written after reading this specific resume. Generic questions that could apply to any candidate are a failure.
+
+FORBIDDEN questions (never generate these or anything like them):
+- "Tell me about yourself"
+- "What's your greatest strength?"
+- "Where do you see yourself in 5 years?"
+- "Why do you want this job?"
+- Any question that does not require reading this resume to write
+
+---
+
+CANDIDATE RESUME:
+
+Name: {candidate_name}
+
+EXPERIENCE:
+{experience_block}
+
+SKILLS:
+Languages: {skills_languages}
+Frameworks: {skills_frameworks}
+Tools: {skills_tools}
+
+GAPS IDENTIFIED (numbered — reference these by number in gap-probing questions):
+{gap_analysis_block}
+
+---
+
+QUESTION CATEGORIES AND COUNTS (must match exactly):
+- behavioral: 10 questions
+- technical: 8 questions
+- gap_probing: 5 questions
+- situational: 3 questions
+- closing: 2 questions
+
+---
+
+CATEGORY INSTRUCTIONS:
+
+behavioral (10):
+- Each question must reference a specific company name, role title, or bullet point from the EXPERIENCE section above.
+- Ask about what the candidate personally did, what the outcome was, and what their specific contribution was.
+- If a role has vague_claims, ask the candidate to walk through exactly what "improved X" or "worked on Y" meant in practice.
+- If has_metrics is false for a role, probe for what a measurable outcome looked like.
+- source_ref must name the specific company or role (e.g., "Acme Corp — Software Engineer").
+
+technical (8):
+- Each question must name a specific language, framework, or tool from the SKILLS section above.
+- Go beyond surface level — ask about tradeoffs, debugging experience, limitations they've hit, or a specific scenario where they used it.
+- Do not ask "are you familiar with X?" — assume they are, and probe depth.
+- source_ref must name the exact skill (e.g., "Python", "React", "Docker").
+
+gap_probing (5):
+- One question per numbered gap in the GAPS IDENTIFIED section. You must cover all 5 gaps. If there are fewer than 5 gaps, create additional gap-probing questions targeting vague_claims or short tenures.
+- Frame each question as curious and natural — never accusatory. The answer will reveal the gap on its own.
+- Do not telegraph that you are probing a weakness (e.g., do not say "I noticed a gap" or "only X months").
+- source_ref must be the gap reference string, e.g., "gap_1", "gap_2", etc.
+
+situational (3):
+- Role-realistic hypotheticals testing judgment in realistic scenarios.
+- Infer the likely target role from the candidate's most recent experience and overall trajectory.
+- Each question should describe a concrete scenario and ask what the candidate would do.
+- source_ref can be the inferred role context (e.g., "inferred: backend engineer").
+
+closing (2):
+- Question 1: What they are looking for in their next role and why now.
+- Question 2: Which area of their work do they feel they have the most room to grow in.
+- source_ref must be an empty string "" for closing questions.
+
+---
+
+FOLLOW-UP RULES:
+- follow_up_vague: What to say if the answer is short, generic, or lacks specifics. Must press for a concrete example or number.
+- follow_up_strong: What to say if the answer is detailed and strong. Must probe one level deeper — ask about a tradeoff, an exception, what they'd do differently, or a related challenge.
+- follow_up_vague and follow_up_strong must be substantively different from each other and from the main question text.
+
+---
+
+OUTPUT FORMAT:
+
+Return a JSON array of exactly 28 objects. Each object must have all 6 fields:
+
+[
+  {
+    "id": "behavioral_01",
+    "category": "behavioral",
+    "text": "...",
+    "source_ref": "...",
+    "follow_up_vague": "...",
+    "follow_up_strong": "..."
+  },
+  ...
+]
+
+ID format: {category}_{two-digit-number}, e.g., behavioral_01 through behavioral_10, technical_01 through technical_08, gap_probing_01 through gap_probing_05, situational_01 through situational_03, closing_01 through closing_02.
+
+Return only the JSON array. No other text.
