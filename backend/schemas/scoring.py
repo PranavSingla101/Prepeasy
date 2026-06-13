@@ -38,7 +38,13 @@ class ScoreResult(BaseModel):
     @model_validator(mode="after")
     def check_skipped_and_compute_overall(self) -> "ScoreResult":
         if self.skipped:
-            numeric_fields = [self.relevance, self.specificity, self.structure, self.communication]
+            numeric_fields = [
+                self.relevance,
+                self.specificity,
+                self.structure,
+                self.communication,
+                self.overall,
+            ]
             text_fields = [self.strongest_moment, self.weakest_moment, self.suggested_rewrite]
             if any(f is not None for f in numeric_fields + text_fields):
                 raise ValueError(
@@ -47,8 +53,7 @@ class ScoreResult(BaseModel):
             self.overall = None
         else:
             dims = [self.relevance, self.specificity, self.structure, self.communication]
-            if all(d is not None for d in dims):
-                self.overall = round(sum(dims) / len(dims), 1)
-            else:
-                self.overall = None
+            if any(d is None for d in dims):
+                raise ValueError("Non-skipped answers must include all four score dimensions")
+            self.overall = round(sum(dims) / len(dims), 1)
         return self

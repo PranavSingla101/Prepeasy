@@ -15,7 +15,7 @@ from backend.db.events import (
     log_event,
 )
 from backend.scoring.scorer import score_answer_async
-from backend.db.session import get_question_bank
+from backend.db.session import get_question_bank, save_transcript_entry
 from backend.orchestrator.state import InterviewState
 from backend.schemas.session import OrchestratorDecision, TranscriptEntry
 
@@ -199,12 +199,14 @@ async def _advance_question(
 
 
 def _append_entry(state: InterviewState, speaker: str, text: str) -> None:
-    state.transcript_log.append(TranscriptEntry(
+    entry = TranscriptEntry(
         speaker=speaker,  # type: ignore[arg-type]
         text=text,
         question_id=state.current_question_id,
         ts=time.time(),
-    ))
+    )
+    state.transcript_log.append(entry)
+    save_transcript_entry(state.session_id, entry)
 
 
 def _build_prompt(state: InterviewState, force_follow_up_vague: bool) -> str:

@@ -157,3 +157,45 @@ def get_scores(session_id: str) -> list:
             (session_id,),
         ).fetchall()
     return [ScoreResult.model_validate_json(row["scores_json"]) for row in rows]
+
+
+# ---------------------------------------------------------------------------
+# Transcripts
+# ---------------------------------------------------------------------------
+
+def _ensure_transcripts_table(conn: sqlite3.Connection) -> None:
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS transcripts (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id  TEXT NOT NULL,
+            question_id TEXT NOT NULL,
+            speaker     TEXT NOT NULL,
+            text        TEXT NOT NULL,
+            ts          REAL NOT NULL
+        )
+    """)
+
+
+def save_transcript_entry(session_id: str, entry) -> None:
+    """Persist one TranscriptEntry to SQLite."""
+    with _connect() as conn:
+        _ensure_transcripts_table(conn)
+        conn.execute(
+            "INSERT INTO transcripts (session_id, question_id, speaker, text, ts) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (session_id, entry.question_id, entry.speaker, entry.text, entry.ts),
+        )
+        conn.commit()
+
+
+def get_transcripts(session_id: str) -> list:
+    """Return TranscriptEntry rows for a session in chronological order."""
+    from backend.schemas.session import TranscriptEntry
+    with _connect() as conn:
+        _ensure_transcripts_table(conn)
+        rows = conn.execute(
+            "SELECT speaker, text, question_id, ts FROM transcripts "
+            "WHERE session_id = ? ORDER BY ts ASC, id ASC",
+            (session_id,),
+        ).fetchall()
+    return [TranscriptEntry.model_validate(dict(row)) for row in rows]

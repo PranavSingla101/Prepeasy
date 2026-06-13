@@ -8,7 +8,7 @@ Update this file after every meaningful implementation change.
 
 ## Current Goal
 
-- Day 5 complete — Silent per-answer scoring implemented; moving to Day 6 report synthesis
+- Day 6 complete — Report synthesis implemented; moving to Day 7 PDF report generation after live provider verification
 
 ## Completed
 
@@ -53,18 +53,30 @@ Update this file after every meaningful implementation change.
 - `backend/scoring/scorer.py` — `score_answer_async`; filters transcript to user turns only; calls Gemini 2.5 Flash via `run_in_executor`; validates through `ScoreResult`; persists via `save_score`; emits `scoring_complete` event; full error isolation — no exception escapes
 - `backend/db/session.py` — added `_ensure_scores_table`, `save_score`, `get_scores`; `scores` table with `UNIQUE(session_id, question_id)` constraint; lazy table init pattern
 - `backend/orchestrator/orchestrator.py` — replaced `_score_answer` placeholder with delegation to `score_answer_async`; threaded `question_category` through both `asyncio.create_task` call sites in `_advance_question`; removed unused `EVT_SCORING_COMPLETE` import
+- `backend/schemas/scoring.py` — tightened Day 5 validation: skipped records now reject any non-null score/text/overall field; non-skipped records require all four dimensions before computing `overall`
+- `tests/test_scoring_schema.py` — standard-library unittest coverage for `ScoreResult` computed overall, float score coercion, skipped/null invariants, non-skipped required scores, `save_score` duplicate rejection, and `get_scores` timestamp ordering/deserialization
+- `backend/schemas/report.py` — `ReportData` plus nested `DimensionBreakdown`, `CategoryScore`, `TopMoments`, `QuestionFeedback`, and `ActionItem`; validates 1-10 rounded scores, exact quote grounding for report quotes, five unique action priorities, reached-question order, deterministic category/question/score/skipped alignment, and unknown question IDs
+- `backend/prompts/report_v1.txt` — Gemini report synthesis prompt; JSON-only narrative output, forbids recomputing numeric scores, forbids invented quotes, requires exact per-question coverage and five session-specific action items
+- `backend/report/synthesizer.py` — `synthesize_report(session_id) -> ReportData`; loads question bank, scores, and persisted transcripts; enforces question/score/transcript alignment; computes overall, dimension, and category aggregates deterministically; calls Gemini 2.5 Flash in JSON mode for narrative fields; validates final `ReportData`
+- `backend/report/synthesizer.py` — prompt interpolation hardened to named placeholder replacement so literal JSON examples in `report_v1.txt` do not break formatting
+- `tests/test_report_synthesis.py` — mock Day 6 coverage for deterministic aggregates ignoring skipped answers, category scores from `QuestionBank`, per-question feedback order, missing-score hard failure before Gemini, missing-question score failure, invented quote validation failure, and complete `ReportData` synthesis without network calls
+- `DOCS/Feature-specs/07-pdf-report-generation.md` — Day 7 PDF report generation spec; covers data fetching, Jinja2 template mapping, WeasyPrint rendering, cached filesystem PDFs, FastAPI download route, optional HTML preview, tests, and completion checks
 
 ## In Progress
 
 - DEEPGRAM_API_KEY needs to be added to .env (GEMINI_API_KEY already set)
 - Live end-to-end test: connect browser mic, verify session with adaptive follow-up + scoring behavior
+- Day 5 full live-session checklist remains pending because it requires an end-to-end voice run with valid provider keys
+- Run Day 6 synthesis against a real Day 5 session once live scoring data exists
+- Day 7 implementation is now specified and ready to build
 
 ## Next Up
 
 - Add `DEEPGRAM_API_KEY` to `.env`
 - Run server: `Interv\Scripts\uvicorn backend.main:app --reload --port 8000`
 - Verify Day 5 checklist items in `DOCS/Feature-specs/05-silent-per-answer-scoring.md`
-- Day 6 — Report synthesis (`backend/report/synthesizer.py`, `backend/schemas/report.py`, `backend/prompts/report_v1.txt`)
+- Run `synthesize_report(session_id)` against the live scored session to complete the real-session Day 6 checklist
+- Implement Day 7 from `DOCS/Feature-specs/07-pdf-report-generation.md`
 
 ## Open Questions
 
@@ -90,13 +102,19 @@ Update this file after every meaningful implementation change.
 - **Silence timer** fires every 1s asyncio task; skipped while TTS is playing; resets on vad_start
 - **Day 4 adaptive follow-up spec** created at `DOCS/Feature-specs/04-adaptive-follow-up-logic.md`; it treats the next work as orchestration refinement before real scoring
 - **Day 5 scoring spec** created at `DOCS/Feature-specs/05-silent-per-answer-scoring.md`
+- **Day 6 report synthesis spec** created at `DOCS/Feature-specs/06-report-synthesis.md`; it scopes synthesis to validated `ReportData` and leaves PDF rendering/download for Day 7
+- **Day 7 PDF report generation spec** created at `DOCS/Feature-specs/07-pdf-report-generation.md`; it scopes Day 7 to backend PDF rendering, filesystem caching, and a FastAPI download endpoint
 - **ScoreResult.overall** is computed by the Pydantic model validator, not returned by Gemini — prevents prompt drift affecting aggregates
+- **ScoreResult strictness**: non-skipped answers must validate with all four score dimensions present; skipped answers must keep all scoring, moment, rewrite, and overall fields null
 - **Scoring error isolation**: `score_answer_async` wraps entire body in try/except; a scoring failure logs and returns silently, never crashing the voice session
 - **Scores table UNIQUE constraint** on `(session_id, question_id)` — duplicate insert raises `IntegrityError`, caught by scorer
 - **question_category threaded through orchestrator**: `_score_answer` now accepts and forwards `question_category` to `score_answer_async`; `question_id` in scores table matches `question_id` in `question_asked` events — the join key for Day 6 reporting
 - **Key facts extraction**: `OrchestratorDecision` extended with `key_facts: list[str]`; Gemini returns 0–5 concise facts per answer; orchestrator deduplicates and accumulates into `state.key_facts_mentioned`; injected into every subsequent Gemini call for context continuity
 - **Decision audit trail**: `EVT_DECISION_MADE` event logs `model_action` (raw Gemini output) and `decision_action` (after follow-up cap guard override) so overrides are distinguishable in SQLite events table
 - **Prompt context completeness**: `_build_prompt` now injects `question_id`, `question_category`, `question_source_ref` per Day 4 spec requirement
+- **Day 6 deterministic ownership**: report aggregate numbers, feedback order, question IDs, categories, question text, scores, and skipped flags are owned and validated by Python; Gemini only writes narrative coaching fields
+- **Report quote grounding**: `TopMoments` and `QuestionFeedback.answer_quote` must exactly match user transcript quotes; `ActionItem.example_from_session` may use an exact quote or a transcript-grounded specific paraphrase
+- **Report synthesis is on-demand**: no reports table added in Day 6; `synthesize_report(session_id)` rebuilds from persisted question bank, scores, and transcripts for Day 7 rendering
 
 ## Session Notes
 
@@ -105,4 +123,12 @@ Update this file after every meaningful implementation change.
 - Run parser: `python -m backend.parse_resume <path/to/resume.pdf>` from project root
 - Run question gen: `python -m backend.generate_questions <resume_id>`
 - Run server: `Interv\Scripts\uvicorn backend.main:app --reload --port 8000`
+- Scoring tests: `Interv\Scripts\python -m unittest tests.test_scoring_schema`
+- Report synthesis tests: `Interv\Scripts\python -m unittest tests.test_report_synthesis tests.test_scoring_schema`
 - `.env` must contain: `GEMINI_API_KEY=...` and `DEEPGRAM_API_KEY=...`
+
+## Latest Verification
+
+- 2026-06-13 — `Interv\Scripts\python -m unittest tests.test_scoring_schema` passed (5 tests)
+- 2026-06-13 — `Interv\Scripts\python -m unittest tests.test_report_synthesis tests.test_scoring_schema` passed (9 tests)
+- 2026-06-13 — AST syntax check over `backend/` and `tests/` passed; `compileall` could not write `.pyc` files because the sandbox denied access to existing `__pycache__` folders and `C:\tmp`
