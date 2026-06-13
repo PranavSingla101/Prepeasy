@@ -107,3 +107,53 @@ def get_question_bank(session_id: str):
         "resume_name": row["resume_name"],
         "questions": json.loads(row["questions_json"]),
     })
+
+
+# ---------------------------------------------------------------------------
+# Scores
+# ---------------------------------------------------------------------------
+
+def _ensure_scores_table(conn: sqlite3.Connection) -> None:
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS scores (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id  TEXT NOT NULL,
+            question_id TEXT NOT NULL,
+            skipped     INTEGER NOT NULL,
+            scores_json TEXT NOT NULL,
+            ts          REAL NOT NULL,
+            UNIQUE (session_id, question_id)
+        )
+    """)
+
+
+def save_score(session_id: str, question_id: str, score_result) -> None:
+    """Persist a ScoreResult to SQLite. Raises sqlite3.IntegrityError on duplicate."""
+    import time
+    ts = time.time()
+    with _connect() as conn:
+        _ensure_scores_table(conn)
+        conn.execute(
+            "INSERT INTO scores (session_id, question_id, skipped, scores_json, ts) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (
+                session_id,
+                question_id,
+                1 if score_result.skipped else 0,
+                score_result.model_dump_json(),
+                ts,
+            ),
+        )
+        conn.commit()
+
+
+def get_scores(session_id: str) -> list:
+    """Return all ScoreResult objects for a session, ordered by ts ASC."""
+    from backend.schemas.scoring import ScoreResult
+    with _connect() as conn:
+        _ensure_scores_table(conn)
+        rows = conn.execute(
+            "SELECT scores_json FROM scores WHERE session_id = ? ORDER BY ts ASC",
+            (session_id,),
+        ).fetchall()
+    return [ScoreResult.model_validate_json(row["scores_json"]) for row in rows]

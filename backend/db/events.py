@@ -17,6 +17,7 @@ EVT_INTERRUPTION = "interruption"
 EVT_TTS_COMPLETE = "tts_complete"
 EVT_SCORING_COMPLETE = "scoring_complete"
 EVT_SESSION_END = "session_end"
+EVT_DECISION_MADE = "decision_made"
 
 
 def _connect() -> sqlite3.Connection:

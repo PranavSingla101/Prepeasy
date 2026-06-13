@@ -16,6 +16,7 @@ class TranscriptEntry(BaseModel):
 class OrchestratorDecision(BaseModel):
     action: Literal["follow_up", "probe", "next_question", "close"]
     text: str
+    key_facts: list[str] = []
 
     @field_validator("text")
     @classmethod

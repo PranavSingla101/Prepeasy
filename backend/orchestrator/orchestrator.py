@@ -9,11 +9,12 @@ from google import genai
 from google.genai import types as genai_types
 
 from backend.db.events import (
+    EVT_DECISION_MADE,
     EVT_QUESTION_ASKED,
-    EVT_SCORING_COMPLETE,
     EVT_SESSION_END,
     log_event,
 )
+from backend.scoring.scorer import score_answer_async
 from backend.db.session import get_question_bank
 from backend.orchestrator.state import InterviewState
 from backend.schemas.session import OrchestratorDecision, TranscriptEntry
@@ -103,12 +104,26 @@ async def handle_transcript(session_id: str, text: str) -> str:
         logger.error("Gemini response validation failed. raw=%s error=%s", raw_response, exc)
         raise
 
+    # Merge extracted key facts (dedup, preserve order)
+    for fact in decision.key_facts:
+        if fact and fact not in state.key_facts_mentioned:
+            state.key_facts_mentioned.append(fact)
+
     # --- Follow-up cap guard (orchestrator enforces, not LLM) ---
-    action = decision.action
+    model_action = decision.action
+    action = model_action
     if action in ("follow_up", "probe") and state.follow_up_count >= 2:
         action = "next_question"
 
     response_text = decision.text
+
+    # Log decision metadata so raw model action vs final action are distinguishable
+    log_event(session_id, EVT_DECISION_MADE, {
+        "question_id": state.current_question_id,
+        "model_action": model_action,
+        "decision_action": action,
+        "follow_up_count": state.follow_up_count,
+    })
 
     if action in ("follow_up", "probe"):
         state.follow_up_count += 1
@@ -153,7 +168,8 @@ async def _advance_question(
 
         # Fire async scoring for the completed question (non-blocking)
         asyncio.create_task(_score_answer(
-            state.session_id, completed_q.id, completed_q.text, answer_transcript, skipped
+            state.session_id, completed_q.id, completed_q.text, completed_q.category,
+            answer_transcript, skipped
         ))
 
         response_text = (preamble + " " if preamble else "") + next_q.text
@@ -175,7 +191,8 @@ async def _advance_question(
         _append_entry(state, "agent", closing)
 
         asyncio.create_task(_score_answer(
-            state.session_id, completed_q.id, completed_q.text, answer_transcript, skipped
+            state.session_id, completed_q.id, completed_q.text, completed_q.category,
+            answer_transcript, skipped
         ))
         log_event(state.session_id, EVT_SESSION_END, {"reason": "all_questions_complete"})
         return closing
@@ -209,6 +226,9 @@ def _build_prompt(state: InterviewState, force_follow_up_vague: bool) -> str:
         )
 
     return template.format(
+        question_id=q.id,
+        question_category=q.category,
+        question_source_ref=q.source_ref,
         current_question=q.text,
         follow_up_vague=q.follow_up_vague,
         follow_up_strong=q.follow_up_strong,
@@ -241,14 +261,10 @@ async def _score_answer(
     session_id: str,
     question_id: str,
     question_text: str,
+    question_category: str,
     transcript: list[TranscriptEntry],
     skipped: bool = False,
 ) -> None:
-    """Placeholder — scoring module (Day 4) will replace this body."""
-    start = time.time()
-    duration_ms = int((time.time() - start) * 1000)
-    log_event(session_id, EVT_SCORING_COMPLETE, {
-        "question_id": question_id,
-        "scores": {"skipped": skipped, "status": "pending_day4"},
-        "scoring_duration_ms": duration_ms,
-    })
+    await score_answer_async(
+        session_id, question_id, question_text, question_category, transcript, skipped
+    )
