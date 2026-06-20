@@ -8,10 +8,15 @@ Update this file after every meaningful implementation change.
 
 ## Current Goal
 
-- Day 6 complete — Report synthesis implemented; moving to Day 7 PDF report generation after live provider verification
+- Day 7 complete — PDF report generation implemented; moving to next phase (Day 8 frontend upload/history or verification)
 
 ## Completed
 
+- `backend/templates/report_template.html` — WeasyPrint-compatible Jinja2 HTML/CSS print template with dynamic score classes, progress bars, best/weakest moment callouts, and detailed feedback cards.
+- `backend/report/renderer.py` — `render_report_pdf(session_id, force_refresh)` logic with filesystem caching under `reports/`, output size validation, and graceful GTK3/WeasyPrint import check.
+- `backend/api/report.py` — API routes for `/reports/{session_id}/download` and `/reports/{session_id}/preview` with regex-based session ID sanitization and HTTP exception translation.
+- `backend/main.py` — registered report API router under the `/reports` subpath.
+- `tests/test_pdf_report.py` — complete unit test suite for the PDF rendering and routing layers, using a mock WeasyPrint module to ensure portability across environments without the GTK3 runtime.
 - `backend/parser/extractor.py` — PDF text extraction (pdfplumber primary, PyMuPDF fallback); hardened for password-protected and corrupt PDFs
 - `backend/parser/prompts/extraction_v1.txt` — original prompt location (kept for reference)
 - `backend/prompts/extraction_v1.txt` — Gemini extraction prompt at architecture-correct location
@@ -129,6 +134,7 @@ Update this file after every meaningful implementation change.
 
 ## Latest Verification
 
-- 2026-06-13 — `Interv\Scripts\python -m unittest tests.test_scoring_schema` passed (5 tests)
-- 2026-06-13 — `Interv\Scripts\python -m unittest tests.test_report_synthesis tests.test_scoring_schema` passed (9 tests)
+
+- 2026-06-13 — PDF report generation tests passed (`tests.test_pdf_report`), and all 15 tests (scoring, synthesis, pdf) ran successfully.
+- 2026-06-13 — `Interv\Scripts\python -m unittest discover -s tests -p "test_*.py"` passed (15 tests)
 - 2026-06-13 — AST syntax check over `backend/` and `tests/` passed; `compileall` could not write `.pyc` files because the sandbox denied access to existing `__pycache__` folders and `C:\tmp`
